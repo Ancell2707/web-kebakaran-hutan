@@ -1,0 +1,25 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin — Pantau Api</title><meta name="robots" content="noindex"><link rel="stylesheet" href="/static/style.css">
+<style>main{max-width:900px;margin:0 auto;padding:30px 5vw}input,select{padding:10px;background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:8px;font:inherit}
+.k{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}.k img{max-width:260px;border-radius:8px;display:block;margin:8px 0}
+button{padding:8px 14px;border-radius:8px;border:0;cursor:pointer;font-weight:600;margin-right:8px}.ok{background:#4ade80}.no{background:#f87171}</style></head><body>
+<nav><a href="/"><b>🔥 Pantau</b>Api</a><div class="m"><a href="/peta">Peta</a></div></nav>
+<main><h1>Panel admin</h1>
+<div id="login"><input type="password" id="pw" placeholder="Password admin"> <button class="ok" id="masuk">Masuk</button> <span id="err"></span></div>
+<div id="isi" hidden><select id="st"><option value="menunggu">Menunggu</option><option value="terverifikasi">Terverifikasi</option><option value="ditolak">Ditolak</option></select>
+<button id="keluar" style="margin-left:10px">Keluar</button><div id="list"></div></div></main>
+<script>
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const post=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
+async function muat(){
+ const r=await fetch('/api/admin/laporan?status='+st.value);
+ if(r.status===401){login.hidden=false;isi.hidden=true;return}
+ login.hidden=true;isi.hidden=false;const d=await r.json();
+ list.innerHTML=d.length?d.map(x=>`<div class="k"><b>#${x.id}</b> · ${esc(x.waktu)} UTC · ${esc(x.nama||'Anonim')}<br>${esc(x.deskripsi)}<br>
+ <a href="https://www.openstreetmap.org/?mlat=${x.lat}&mlon=${x.lon}#map=13/${x.lat}/${x.lon}" target="_blank" rel="noopener">${x.lat.toFixed(5)}, ${x.lon.toFixed(5)}</a>
+ ${x.foto?`<img src="/uploads/${esc(x.foto)}">`:''}
+ <button class="ok" onclick="ubah(${x.id},'terverifikasi')">Verifikasi</button><button class="no" onclick="ubah(${x.id},'ditolak')">Tolak</button></div>`).join(''):'<p>Tidak ada laporan.</p>'}
+async function ubah(i,s){await post('/api/admin/laporan/'+i,{status:s});muat()}
+masuk.onclick=async()=>{const r=await post('/api/admin/login',{password:pw.value});const j=await r.json();err.textContent=r.ok?'':j.error;pw.value='';if(r.ok)muat()};
+keluar.onclick=async()=>{await post('/api/admin/logout');muat()};st.onchange=muat;muat();
+</script></body></html>

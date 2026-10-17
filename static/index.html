@@ -1,0 +1,25 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pantau Api — Peta Titik Panas Kebakaran Hutan Indonesia</title>
+<meta name="description" content="Pantau titik panas (hotspot) kebakaran hutan dan lahan di Indonesia dari data satelit NASA FIRMS, diperbarui otomatis.">
+<meta property="og:title" content="Pantau Api — Peta Titik Panas Kebakaran Hutan Indonesia"><meta property="og:description" content="Pantau titik panas (hotspot) kebakaran hutan dan lahan di Indonesia dari data satelit NASA FIRMS, diperbarui otomatis."><meta property="og:type" content="website">
+<link rel="stylesheet" href="/static/style.css"></head><body>
+<nav><a href="/"><b>🔥 Pantau</b>Api</a><div class="m"><a href="/">Beranda</a><a href="/peta">Peta</a><a href="/statistik">Statistik</a><a href="/lapor">Lapor</a></div></nav>
+<section class="hero"><video autoplay muted loop playsinline preload="metadata"><source src="/static/hutan.mp4" type="video/mp4"></video><h1>Pantau titik panas kebakaran hutan di Indonesia</h1>
+<p>Data satelit NASA FIRMS (VIIRS) yang diperbarui otomatis, lengkap dengan filter tanggal dan tingkat kepercayaan.</p>
+<a class="btn b1" href="/peta">Lihat Peta Hotspot</a><a class="btn b2" href="/lapor">Laporkan Kebakaran</a></section>
+<section class="stats">
+<div class="stat"><b id="s1">…</b><span>Hotspot 2 hari terakhir</span></div>
+<div class="stat"><b id="s2">…</b><span>Confidence tinggi</span></div>
+<div class="stat"><b id="s3">…</b><span>Rata-rata intensitas (FRP, MW)</span></div>
+<div class="stat"><b id="s4" style="font-size:1.5rem">…</b><span>Provinsi dengan hotspot terbanyak</span></div></section>
+<section style="padding:0 5vw 40px;max-width:900px;color:var(--mut);line-height:1.7"><h2 style="color:var(--txt)">Tentang Pantau Api</h2><p>Pantau Api adalah web pemantauan titik panas (hotspot) kebakaran hutan dan lahan di Indonesia. Data hotspot berasal dari satelit NASA FIRMS (VIIRS) dan diperbarui otomatis, dilengkapi layer angin, kelembapan, kualitas udara (AQI), statistik per provinsi, serta laporan warga yang diverifikasi admin.</p></section>
+<footer>Sumber data: NASA FIRMS. Proyek mahasiswa Informatika Universitas Mulawarman.</footer>
+<script>
+fetch('/api/hotspots?days=2').then(r=>r.json()).then(j=>{
+ if(j.error) throw j.error;const d=j.data;
+ s1.textContent=d.length.toLocaleString('id');
+ s2.textContent=d.filter(h=>h.confidence==='h').length.toLocaleString('id');
+ s3.textContent=d.length?(d.reduce((a,h)=>a+h.frp,0)/d.length).toFixed(1):'0';
+}).catch(()=>{s1.textContent=s2.textContent=s3.textContent='–'});
+fetch('/api/statistik?days=2').then(r=>r.json()).then(j=>{s4.textContent=j.provinsi.find(p=>p.nama!=='Di luar wilayah').nama}).catch(()=>{s4.textContent='–'});
+</script></body></html>

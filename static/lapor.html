@@ -1,0 +1,33 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Laporkan kejadian kebakaran hutan dan lahan di sekitar Anda lengkap dengan lokasi dan foto. Laporan diverifikasi admin sebelum tampil di peta.">
+<title>Lapor Kebakaran — Pantau Api</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="/static/style.css">
+<style>main{max-width:760px;margin:0 auto;padding:30px 5vw}label{display:block;margin:14px 0 4px;color:var(--mut)}
+input,textarea{width:100%;padding:10px;background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:8px;font:inherit}
+#map{height:320px;border-radius:12px;margin:10px 0}.darurat{background:#3a1d12;border:1px solid #7a3a1d;border-radius:10px;padding:12px;margin:14px 0;font-size:.9rem}
+button.btn{border:0;cursor:pointer;font-size:1rem}#msg{margin-top:12px}</style></head><body>
+<nav><a href="/"><b>🔥 Pantau</b>Api</a><div class="m"><a href="/">Beranda</a><a href="/peta">Peta</a><a href="/statistik">Statistik</a><a href="/lapor">Lapor</a></div></nav>
+<main><h1>Laporkan kebakaran</h1>
+<div class="darurat">Jika api sedang mengancam jiwa atau permukiman, hubungi <b>112</b>, damkar, atau BPBD setempat lebih dulu. Form ini bukan layanan darurat.</div>
+<p style="color:var(--mut)">Klik peta untuk menandai lokasi, atau gunakan lokasi Anda. Laporan diverifikasi admin sebelum tampil di peta.</p>
+<div id="map"></div><button type="button" class="btn b2" id="gps">Gunakan lokasi saya</button><p id="koord" style="color:var(--mut)">Lokasi belum dipilih</p>
+<label>Nama (opsional)</label><input id="nama" maxlength="60">
+<label>Deskripsi kejadian</label><textarea id="desk" rows="4" maxlength="1000" placeholder="Apa yang terlihat, kira-kira seluas apa, apakah ada asap tebal"></textarea>
+<label>Foto (JPG/PNG/WEBP, maks 5 MB, opsional)</label><input type="file" id="foto" accept="image/jpeg,image/png,image/webp">
+<button class="btn b1" id="kirim">Kirim laporan</button><p id="msg"></p></main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map=L.map('map').setView([-2.5,118],5);let pin=null,lat=null,lon=null;
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+function set(a,o,z){lat=a;lon=o;if(pin)pin.setLatLng([a,o]);else pin=L.marker([a,o]).addTo(map);koord.textContent=`Lokasi: ${a.toFixed(5)}, ${o.toFixed(5)}`;if(z)map.setView([a,o],12)}
+map.on('click',e=>set(e.latlng.lat,e.latlng.lng,false));
+gps.onclick=()=>navigator.geolocation?navigator.geolocation.getCurrentPosition(p=>set(p.coords.latitude,p.coords.longitude,true),()=>msg.textContent='Lokasi tidak bisa diakses, klik peta saja.'):msg.textContent='Browser tidak mendukung lokasi.';
+kirim.onclick=async()=>{
+ if(lat===null){msg.textContent='Pilih lokasi di peta dulu.';return}
+ if(foto.files[0]&&foto.files[0].size>5*1024*1024){msg.textContent='Foto lebih dari 5 MB.';return}
+ const f=new FormData();f.append('lat',lat);f.append('lon',lon);f.append('nama',nama.value);f.append('deskripsi',desk.value);if(foto.files[0])f.append('foto',foto.files[0]);
+ kirim.disabled=true;msg.textContent='Mengirim…';
+ try{const r=await fetch('/api/laporan',{method:'POST',body:f});const j=await r.json();
+  if(!r.ok)throw j.error||'Gagal mengirim';msg.textContent='Terima kasih, laporan terkirim dan menunggu verifikasi.';desk.value='';foto.value=''}
+ catch(e){msg.textContent='Gagal: '+e}kirim.disabled=false};
+</script></body></html>

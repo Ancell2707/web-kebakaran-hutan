@@ -1,0 +1,28 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Statistik dan grafik jumlah hotspot kebakaran hutan di Indonesia per provinsi, per hari, dan per bulan.">
+<title>Statistik Hotspot — Pantau Api</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>main{padding:30px 5vw;max-width:1100px;margin:0 auto}.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:22px}
+h2{margin:0 0 12px;font-size:1.1rem}select{padding:8px;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:6px}#tot{color:var(--mut);margin-left:12px}</style></head><body>
+<nav><a href="/"><b>🔥 Pantau</b>Api</a><div class="m"><a href="/">Beranda</a><a href="/peta">Peta</a><a href="/statistik">Statistik</a><a href="/lapor">Lapor</a></div></nav>
+<main><h1>Statistik hotspot</h1>
+<select id="days"><option value="2">2 hari terakhir</option><option value="3">3 hari</option><option value="5" selected>5 hari</option></select><span id="tot"></span>
+<div class="box" style="margin-top:18px"><h2>Jumlah hotspot per provinsi (15 teratas)</h2><canvas id="c1" height="140"></canvas></div>
+<div class="box"><h2>Jumlah hotspot per hari</h2><canvas id="c2" height="90"></canvas></div>
+<div class="box"><h2>Jumlah hotspot per bulan</h2><canvas id="c3" height="90"></canvas><p style="color:var(--mut);font-size:.85rem">Dihitung dari data yang direkam web ini sejak mulai dijalankan, bukan seluruh data historis.</p></div></main>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+Chart.defaults.color='#9fb3a6';Chart.defaults.borderColor='#26402f';
+let a,b,cm;
+function bar(old,id,labels,data,horiz){if(old)old.destroy();return new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data,backgroundColor:'#ff7a2f'}]},options:{indexAxis:horiz?'y':'x',plugins:{legend:{display:false}}}})}
+async function load(){
+ const r=await fetch('/api/statistik?days='+days.value);const j=await r.json();
+ if(j.error){tot.textContent='Gagal memuat: '+j.error;return}
+ tot.textContent=j.total.toLocaleString('id')+' titik';
+ const p=j.provinsi.slice(0,15);
+ a=bar(a,'c1',p.map(x=>x.nama),p.map(x=>x.jumlah),true);
+ b=bar(b,'c2',j.harian.map(x=>x.tanggal),j.harian.map(x=>x.jumlah),false);
+ const m=await (await fetch('/api/statistik/bulanan')).json();cm=bar(cm,'c3',m.map(x=>x.bulan),m.map(x=>x.jumlah),false);
+}
+days.onchange=load;load();
+</script></body></html>

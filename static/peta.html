@@ -1,0 +1,78 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Peta interaktif titik panas (hotspot) kebakaran hutan dan lahan di Indonesia dari satelit NASA FIRMS, dengan filter provinsi, tanggal, angin, kelembapan, dan kualitas udara.">
+<title>Peta Hotspot — Pantau Api</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/static/style.css">
+<style>body{height:100vh;display:flex;flex-direction:column}.w{flex:1;display:flex;min-height:0}
+aside{width:270px;padding:18px;background:var(--card);border-right:1px solid var(--line);overflow:auto}
+aside h3{margin:14px 0 6px;font-size:.95rem}aside h3:first-child{margin-top:0}aside label{display:block;margin:6px 0;color:var(--mut)}
+select,input[type=date]{width:100%;padding:8px;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:6px;color-scheme:dark}
+#map{flex:1}#info{margin-top:18px;font-size:.9rem;color:var(--mut)}
+@media(max-width:700px){.w{flex-direction:column}aside{width:auto;border:0}}</style></head><body>
+<nav><a href="/"><b>🔥 Pantau</b>Api</a><div class="m"><a href="/">Beranda</a><a href="/peta">Peta</a><a href="/statistik">Statistik</a><a href="/lapor">Lapor</a></div></nav>
+<div class="w"><aside>
+<h3>Provinsi</h3><select id="prov"><option value="">Semua provinsi</option></select>
+<h3>Tanggal mulai (opsional)</h3><input type="date" id="tgl">
+<h3>Rentang waktu</h3><select id="days"><option value="1">1 hari</option><option value="2">2 hari</option><option value="3">3 hari</option><option value="5" selected>5 hari</option></select>
+<h3>Tingkat kepercayaan</h3>
+<label><input type="checkbox" class="cf" value="h" checked> Tinggi</label>
+<label><input type="checkbox" class="cf" value="n" checked> Nominal</label>
+<label><input type="checkbox" class="cf" value="l"> Rendah</label>
+<h3>Layer tambahan</h3>
+<label><input type="checkbox" id="lAngin"> Angin (panah)</label>
+<label><input type="checkbox" id="lLembab"> Kelembapan</label>
+<label><input type="checkbox" id="lAqi"> Kualitas udara (AQI)</label>
+<label><input type="checkbox" id="lLap"> Laporan warga</label>
+<div id="legend" style="font-size:.8rem;color:var(--mut);line-height:1.5"></div>
+<div id="info">Memuat data…</div></aside><div id="map"></div></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map=L.map('map').setView([-2.5,118],5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+const layer=L.layerGroup().addTo(map),col={h:'#ff3b30',n:'#ff9f0a',l:'#ffd60a'},nm={h:'Tinggi',n:'Nominal',l:'Rendah'};
+const sat=s=>({N:'Suomi NPP','1':'NOAA-20','2':'NOAA-21'})[s]||s;
+const wib=(t,j)=>{let [h,m]=j.split(':').map(Number);h=(h+7)%24;return `${t} ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} WIB`};
+fetch('/api/provinsi').then(r=>r.json()).then(l=>l.forEach(n=>prov.add(new Option(n,n))));
+async function load(fit){
+ info.textContent='Memuat data…';layer.clearLayers();
+ const c=[...document.querySelectorAll('.cf:checked')].map(e=>e.value).join(',')||'x';
+ const q=new URLSearchParams({days:days.value,confidence:c});
+ if(prov.value)q.set('provinsi',prov.value);if(tgl.value)q.set('tanggal',tgl.value);
+ try{const r=await fetch('/api/hotspots?'+q);const j=await r.json();if(j.error)throw j.error;
+  const pts=j.data.map(h=>{L.circleMarker([h.lat,h.lon],{radius:Math.min(4+h.frp/8,12),color:col[h.confidence],fillOpacity:.6,weight:1})
+   .bindPopup(`<b>Titik panas</b><br>Provinsi: ${h.provinsi}<br>Koordinat: ${h.lat.toFixed(4)}, ${h.lon.toFixed(4)}<br>Waktu: ${wib(h.tanggal,h.jam_utc)}<br>Satelit: ${sat(h.satelit)}<br>Intensitas (FRP): ${h.frp} MW<br>Confidence: ${nm[h.confidence]}`).addTo(layer);return [h.lat,h.lon]});
+  if(fit&&pts.length)map.fitBounds(pts,{padding:[30,30],maxZoom:9});
+  info.textContent=`${j.total.toLocaleString('id')} titik · data terbaru: ${j.terbaru||'-'}`;
+ }catch(e){info.textContent='Gagal memuat data: '+e}
+}
+prov.onchange=()=>load(true);
+[days,tgl].forEach(e=>e.onchange=()=>load(false));
+document.querySelectorAll('.cf').forEach(e=>e.onchange=()=>load(false));load(false);
+
+// ---- Layer cuaca, angin, kelembapan, AQI (Open-Meteo) ----
+const gA=L.layerGroup(),gL=L.layerGroup(),gQ=L.layerGroup();let cuaca=null,aqi=null;
+const get=async u=>{const j=await (await fetch(u)).json();if(j.error)throw j.error;return j};
+const aqiK=v=>v<=50?['#4ade80','Baik']:v<=100?['#facc15','Sedang']:v<=150?['#fb923c','Tidak sehat bagi kelompok sensitif']:v<=200?['#ef4444','Tidak sehat']:v<=300?['#a855f7','Sangat tidak sehat']:['#7f1d1d','Berbahaya'];
+const lembK=v=>v<40?'#fb923c':v<70?'#a3e635':'#38bdf8';
+function legenda(){legend.innerHTML=[lAngin.checked?'Panah = arah angin bertiup; makin besar makin kencang':'',lLembab.checked?'Kelembapan: oranye &lt;40% (kering), hijau 40-70%, biru &gt;70%':'',lAqi.checked?'AQI (US): hijau baik, kuning sedang, oranye-merah tidak sehat':''].filter(Boolean).join('<br>')}
+async function cuacaToggle(){
+ try{
+  if((lAngin.checked||lLembab.checked)&&!cuaca)cuaca=await get('/api/cuaca');
+  gA.clearLayers();gL.clearLayers();
+  if(lAngin.checked){cuaca.forEach(c=>L.marker([c.lat,c.lon],{icon:L.divIcon({className:'',iconSize:[24,24],iconAnchor:[12,12],html:`<div style="transform:rotate(${(c.arah+180)%360}deg);font-size:${14+Math.min(c.angin,40)/2}px;font-weight:bold;color:#38bdf8;text-shadow:0 0 3px #000;text-align:center">↑</div>`})}).bindPopup(`<b>Angin</b><br>${c.angin} km/jam dari arah ${c.arah}°<br>Suhu: ${c.suhu}°C`).addTo(gA));gA.addTo(map)}else map.removeLayer(gA);
+  if(lLembab.checked){cuaca.forEach(c=>L.circleMarker([c.lat,c.lon],{radius:16,color:lembK(c.kelembapan),fillOpacity:.3,weight:1}).bindPopup(`<b>Kelembapan</b>: ${c.kelembapan}%<br>Suhu: ${c.suhu}°C`).addTo(gL));gL.addTo(map)}else map.removeLayer(gL);
+ }catch(e){info.textContent='Gagal memuat cuaca: '+e}
+ legenda()}
+async function aqiToggle(){
+ try{
+  gQ.clearLayers();
+  if(lAqi.checked){if(!aqi)aqi=await get('/api/aqi');aqi.forEach(a=>{const [c,t]=aqiK(a.aqi);L.circleMarker([a.lat,a.lon],{radius:18,color:c,fillColor:c,fillOpacity:.45,weight:1}).bindPopup(`<b>Kualitas udara</b><br>AQI (US): ${a.aqi} · ${t}<br>PM2.5: ${a.pm25??'-'} µg/m³`).addTo(gQ)});gQ.addTo(map)}else map.removeLayer(gQ);
+ }catch(e){info.textContent='Gagal memuat AQI: '+e}
+ legenda()}
+lAngin.onchange=lLembab.onchange=cuacaToggle;lAqi.onchange=aqiToggle;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const gW=L.layerGroup();
+lLap.onchange=async()=>{gW.clearLayers();if(!lLap.checked){map.removeLayer(gW);return}
+ try{(await get('/api/laporan')).forEach(r=>L.marker([r.lat,r.lon]).bindPopup(`<b>Laporan warga</b><br>${esc(r.waktu.slice(0,16).replace('T',' '))} UTC<br>${esc(r.deskripsi)}${r.foto?`<br><img src="/uploads/${esc(r.foto)}" style="max-width:200px;margin-top:6px">`:''}`).addTo(gW));gW.addTo(map)}
+ catch(e){info.textContent='Gagal memuat laporan: '+e}};
+</script></body></html>
